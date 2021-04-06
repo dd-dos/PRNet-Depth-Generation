@@ -5,6 +5,7 @@ from skimage.transform import estimate_transform, warp
 from time import time
 from PIL import Image
 import torch
+import torchvision
 from predictor import PosPrediction
 
 
@@ -22,13 +23,14 @@ class PRN:
         self.resolution_op = 256
 
         #---- load detectors
+
         if is_dlib:
             import dlib
             detector_path = os.path.join(prefix, 'Data/net-data/mmod_human_face_detector.dat')
             self.face_detector = dlib.cnn_face_detection_model_v1(
                     detector_path)
         else:
-            self.face_detector = torch.jit.load("./retinaface/weights/mobilenet0.25_Final.pth")
+            self.face_detector = torch.jit.load("./crop_face_parallel/retinaface_torchscript/model/scripted_model.pt")
 
         if is_opencv:
             import cv2
@@ -107,9 +109,8 @@ class PRN:
             center = np.array([right - (right - left) / 2.0, bottom - (bottom - top) / 2.0 + old_size*0.14])
             size = int(old_size*1.58)            
         else:
-            detected_faces = self.face_detector.detect_from_image(image)
-            d = self.select_face(detected_faces)
-            d.left(); right = d.right(); top = d.top(); bottom = d.bottom()
+            bboxes = self.face_detector.forward(torch.tensor(image), 256)
+            d = self.select_face(bboxes)
             left = d[0]; right = d[2]; top = d[1]; bottom = d[3]
             old_size = (right - left + bottom - top)/2
             center = np.array([right - (right - left) / 2.0, bottom - (bottom - top) / 2.0 + old_size*0.14])
@@ -123,7 +124,7 @@ class PRN:
         image = image/255.
         cropped_image = warp(image, tform.inverse, output_shape=(self.resolution_inp, self.resolution_inp))
 
-        return cropped_face, tform
+        return cropped_image, tform
 
 
     def postprocess(self, cropped_pos, tform):
@@ -216,13 +217,17 @@ class PRN:
         return colors
 
 
-    def select_face(self, detected_faces):
-        for box_id in range(len(detected_faces)):
-            bbox = bboxes[box_id]
+    def select_face(self, bboxes):
+        '''
+        Assume that all bboxes is valid.
+        '''
+        sizes = []
+        for box_id in range(len(bboxes)):
+            bbox = bboxes[box_id][0].cpu().detach().numpy()
             sizes.append((bbox[2]-bbox[0])*(bbox[3]-bbox[1]))
 
         biggest_id = np.argmax(np.array(sizes))
-        return detected_faces[biggest_id]
+        return bboxes[biggest_id][0].cpu().detach().numpy()
     
 
     def create_depth_map(self, pos, shape):
