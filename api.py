@@ -4,7 +4,7 @@ from skimage.io import imread, imsave
 from skimage.transform import estimate_transform, warp
 from time import time
 from PIL import Image
-
+import torch
 from predictor import PosPrediction
 
 
@@ -27,6 +27,8 @@ class PRN:
             detector_path = os.path.join(prefix, 'Data/net-data/mmod_human_face_detector.dat')
             self.face_detector = dlib.cnn_face_detection_model_v1(
                     detector_path)
+        else:
+            self.face_detector = torch.jit.load("./retinaface/weights/mobilenet0.25_Final.pth")
 
         if is_opencv:
             import cv2
@@ -56,15 +58,8 @@ class PRN:
         '''
         return self.pos_predictor.predict(image)
 
-    def process(self, input, image_info = None, FaceRect_name_full = None, image_shape = None):
-        ''' process image with crop operation.
-        Args:
-            input: (h,w,3) array or str(image path). image value range:1~255. 
-            image_info(optional): the bounding box information of faces. if None, will use dlib to detect face. 
 
-        Returns:
-            pos: the 3D position map. (256, 256, 3).
-        '''
+    def preprocess(self, input, image_info = None, FaceRect_name_full = None, image_shape = None):
         if isinstance(input, str):
             try:
                 image = imread(input)
@@ -90,7 +85,6 @@ class PRN:
             old_size = (right - left + bottom - top)/2
             center = np.array([right - (right - left) / 2.0, bottom - (bottom - top) / 2.0])
             size = int(old_size*1.6)
-            print(left, right, top, bottom)
         elif FaceRect_name_full is not None:
             fid = open(FaceRect_name_full, 'r')
             lines = fid.readlines()
@@ -109,22 +103,17 @@ class PRN:
             bottom = int(256.0 * bottom / image_shape[1])
             '''
 
-            print(left, right, top, bottom)
             old_size = (right - left + bottom - top)/2
             center = np.array([right - (right - left) / 2.0, bottom - (bottom - top) / 2.0 + old_size*0.14])
             size = int(old_size*1.58)            
         else:
-            detected_faces = self.dlib_detect(image)
-            if len(detected_faces) == 0:
-                print('warning: no detected face')
-                return None
-
-            d = detected_faces[0].rect ## only use the first detected face (assume that each input image only contains one face)
-            left = d.left(); right = d.right(); top = d.top(); bottom = d.bottom()
+            detected_faces = self.face_detector.detect_from_image(image)
+            d = self.select_face(detected_faces)
+            d.left(); right = d.right(); top = d.top(); bottom = d.bottom()
+            left = d[0]; right = d[2]; top = d[1]; bottom = d[3]
             old_size = (right - left + bottom - top)/2
             center = np.array([right - (right - left) / 2.0, bottom - (bottom - top) / 2.0 + old_size*0.14])
             size = int(old_size*1.58)
-            print(left, right, top, bottom)
 
         # crop image
         src_pts = np.array([[center[0]-size/2, center[1]-size/2], [center[0] - size/2, center[1]+size/2], [center[0]+size/2, center[1]-size/2]])
@@ -133,6 +122,31 @@ class PRN:
         
         image = image/255.
         cropped_image = warp(image, tform.inverse, output_shape=(self.resolution_inp, self.resolution_inp))
+
+        return cropped_face, tform
+
+
+    def postprocess(self, cropped_pos, tform):
+        cropped_vertices = np.reshape(cropped_pos, [-1, 3]).T
+        z = cropped_vertices[2,:].copy()/tform.params[0,0]
+        cropped_vertices[2,:] = 1
+        vertices = np.dot(np.linalg.inv(tform.params), cropped_vertices)
+        vertices = np.vstack((vertices[:2,:], z))
+        pos = np.reshape(vertices.T, [self.resolution_op, self.resolution_op, 3])
+
+        return pos
+
+
+    def process(self, input, image_info = None, FaceRect_name_full = None, image_shape = None):
+        ''' 
+        process image with crop operation.
+        Args:
+            input: (h,w,3) array or str(image path). image value range:1~255. 
+            image_info(optional): the bounding box information of faces. if None, will use dlib to detect face. 
+
+        Returns:
+            pos: the 3D position map. (256, 256, 3).
+        '''
 
         '''
         ## test cropped_image
@@ -144,16 +158,9 @@ class PRN:
 
         # run our net
         #st = time()
+        cropped_image, tform = self.preprocess(input, image_info, FaceRect_name_full, image_shape)
         cropped_pos = self.net_forward(cropped_image)
-        #print 'net time:', time() - st
-
-        # restore 
-        cropped_vertices = np.reshape(cropped_pos, [-1, 3]).T
-        z = cropped_vertices[2,:].copy()/tform.params[0,0]
-        cropped_vertices[2,:] = 1
-        vertices = np.dot(np.linalg.inv(tform.params), cropped_vertices)
-        vertices = np.vstack((vertices[:2,:], z))
-        pos = np.reshape(vertices.T, [self.resolution_op, self.resolution_op, 3])
+        pos = self.postprocess(cropped_pos, tform)
         
         return pos
             
@@ -179,6 +186,7 @@ class PRN:
         vertices = all_vertices[self.face_ind, :]
 
         return vertices
+
 
     def get_texture(self, image, pos):
         ''' extract uv texture from image. opencv is needed here.
@@ -207,6 +215,43 @@ class PRN:
 
         return colors
 
+
+    def select_face(self, detected_faces):
+        for box_id in range(len(detected_faces)):
+            bbox = bboxes[box_id]
+            sizes.append((bbox[2]-bbox[0])*(bbox[3]-bbox[1]))
+
+        biggest_id = np.argmax(np.array(sizes))
+        return detected_faces[biggest_id]
+    
+
+    def create_depth_map(self, pos, shape):
+        kpt = prn.get_landmarks(pos)
+        vertices = prn.get_vertices(pos)
+        depth_scene_map = DepthImage.generate_depth_image(vertices, kpt, shape, isMedFilter=True)
+
+        return depth_scene_map
+
+
+    def predict_batch(self, imgs, shapes):
+        processed_imgs = []
+        tforms = []
+        depth_maps = []
+
+        for idx in range(len(imgs)):
+            process_img, tform = self.preprocess(imgs[idx], None, None, shapes[idx])
+            processed_imgs.append(process_img)
+            tforms.append(tform)
+
+        cropped_poses = self.pos_predictor.predict_batch(np.array(processed_imgs))
+
+        for idx in range(len(cropped_poses)):
+            pos = self.postprocess(cropped_poses[idx], tforms[idx])
+            depth_map = self.create_depth_map(pos, shapes[idx])
+            depth_maps.append(depth_map)
+        
+        import ipdb; ipdb.set_trace()
+        return depth_maps
 
 
 
