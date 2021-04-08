@@ -32,7 +32,8 @@ class CelebA_live(Dataset):
 
         shape = [img.shape[0], img.shape[1]]
         
-        str_bbox = full_name.split(".")[1:-2]
+        str_bbox = full_name.split(".")[1:-1]
+        # import ipdb; ipdb.set_trace()
         bbox = [float(str_bbox[i]) for i in range(4)]
 
         return img, name, shape, bbox
