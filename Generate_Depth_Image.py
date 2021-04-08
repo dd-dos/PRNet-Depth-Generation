@@ -58,7 +58,7 @@ if __name__=="__main__":
     shutil.rmtree("./comparision", ignore_errors=True)
     os.makedirs("./comparision")
 
-    loader = DataLoader(CelebA_live(), batch_size=32, num_workers=4, collate_fn=collate_fn)
+    loader = DataLoader(CelebA_live(), batch_size=1, num_workers=0, collate_fn=collate_fn)
     for item in tqdm.tqdm(loader):
         imgs, names, shape, bboxes = item
         depth_maps = prn.predict_batch(imgs, shape, bboxes)

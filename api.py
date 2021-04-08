@@ -258,6 +258,7 @@ class PRN:
 
         for idx in range(len(cropped_poses)):
             pos = self.postprocess(cropped_poses[idx], tforms[idx])
+            import ipdb; ipdb.set_trace()
             depth_map = self.create_depth_map(pos, shapes[idx])
             depth_maps.append(depth_map)
         
