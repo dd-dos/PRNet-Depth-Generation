@@ -237,7 +237,6 @@ class PRN:
     
 
     def create_depth_map(self, pos, shape):
-
         kpt = self.get_landmarks(pos)
         vertices = self.get_vertices(pos)
         depth_scene_map = generate_depth_image(vertices, kpt, shape, isMedFilter=True)
@@ -256,16 +255,18 @@ class PRN:
             tforms.append(tform)
 
         cropped_poses = self.pos_predictor.predict_batch(np.array(processed_imgs))
-        cropped_poses_2 = self.pos_predictor.predict(processed_imgs[0])
-        import ipdb; ipdb.set_trace()
+        # cropped_poses_2 = self.pos_predictor.predict(processed_imgs[0])
+        # import ipdb; ipdb.set_trace()
 
 
-        for idx in range(len(cropped_poses)):
-            pos = self.postprocess(cropped_poses[idx], tforms[idx])
-            depth_map = self.create_depth_map(pos, shapes[idx])
-            depth_maps.append(depth_map)
+        # for idx in range(len(cropped_poses)):
+        #     pos = self.postprocess(cropped_poses[idx], tforms[idx])
+        #     depth_map = self.create_depth_map(pos, shapes[idx])
+        #     depth_maps.append(depth_map)
         
-        return depth_maps
+        # return depth_maps
+
+        return cropped_poses, tforms
 
 
 

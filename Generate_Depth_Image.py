@@ -17,17 +17,17 @@ from torch.utils.data import Dataset, DataLoader
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 class CelebA_live(Dataset):
-    def __init__(self):
-        self.img_list = glob.glob("./cropped_face/live/*.jpg")
-        self.img_size = 256
+    def __init__(prn):
+        prn.img_list = glob.glob("./cropped_face/live/*.jpg")
+        prn.img_size = 256
     
-    def __len__(self):
-        return len(self.img_list)
+    def __len__(prn):
+        return len(prn.img_list)
 
-    def __getitem__(self, idx):
-        img = imread(self.img_list[idx])
+    def __getitem__(prn, idx):
+        img = imread(prn.img_list[idx])
         
-        full_name = self.img_list[idx].split("/")[-1]
+        full_name = prn.img_list[idx].split("/")[-1]
         name = full_name.split(".")[0]+".jpg"
 
         shape = [img.shape[0], img.shape[1]]
@@ -60,9 +60,14 @@ if __name__=="__main__":
 
     loader = DataLoader(CelebA_live(), batch_size=1, num_workers=0, collate_fn=collate_fn)
     for item in tqdm.tqdm(loader):
-        imgs, names, shape, bboxes = item
-        depth_maps = prn.predict_batch(imgs, shape, bboxes)
+        imgs, names, shapes, bboxes = item
+        cropped_poses, tforms = prn.predict_batch(imgs, shapes, bboxes)
 
-        for idx in range(len(names)):
+        for idx in range(len(cropped_poses)):
+            pos = prn.postprocess(cropped_poses[idx], tforms[idx])
+            depth_map = prn.create_depth_map(pos, shapes[idx])
+            depth_maps.append(depth_map)
+
+        # for idx in range(len(names)):
             cv2.imwrite("./results/{}".format(names[idx]), depth_maps[idx])
             cv2.imwrite("./comparision/{}".format(names[idx]), cv2.hconcat([imgs[idx], depth_maps[idx]]))
