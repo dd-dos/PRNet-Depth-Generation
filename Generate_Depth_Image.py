@@ -28,12 +28,11 @@ class CelebA_live(Dataset):
         img = imread(prn.img_list[idx])
         
         full_name = prn.img_list[idx].split("/")[-1]
-        name = full_name.split(".")[0]+".jpg"
+        name = full_name.split("_")[0]+".jpg"
 
         shape = [img.shape[0], img.shape[1]]
         
-        str_bbox = full_name.split(".")[1:-1]
-        # import ipdb; ipdb.set_trace()
+        str_bbox = full_name.split("_")[1:-1]
         bbox = [float(str_bbox[i]) for i in range(4)]
 
         return img, name, shape, bbox
@@ -58,7 +57,7 @@ if __name__=="__main__":
     shutil.rmtree("./comparision", ignore_errors=True)
     os.makedirs("./comparision")
 
-    loader = DataLoader(CelebA_live(), batch_size=1, num_workers=0, collate_fn=collate_fn)
+    loader = DataLoader(CelebA_live(), batch_size=64, num_workers=4, collate_fn=collate_fn)
     for item in tqdm.tqdm(loader):
         imgs, names, shapes, bboxes = item
         cropped_poses, tforms = prn.predict_batch(imgs, shapes, bboxes)

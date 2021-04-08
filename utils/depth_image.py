@@ -51,7 +51,6 @@ def z_normalize(z_v):
     return (z_v - np.min(z_v))/(np.max(z_v)-np.min(z_v)+eps)
 
 def convert_vertices_2_map_interp2d_directly(vertices, shape):
-    import ipdb; ipdb.set_trace()
     image_a = np.zeros([shape[0], shape[1]], dtype = np.float32)
 
     image_index_ori = np.array(vertices, np.float32)

@@ -256,8 +256,6 @@ class PRN:
 
         cropped_poses = self.pos_predictor.predict_batch(np.array(processed_imgs))
         # cropped_poses_2 = self.pos_predictor.predict(processed_imgs[0])
-        # import ipdb; ipdb.set_trace()
-
 
         # for idx in range(len(cropped_poses)):
         #     pos = self.postprocess(cropped_poses[idx], tforms[idx])
