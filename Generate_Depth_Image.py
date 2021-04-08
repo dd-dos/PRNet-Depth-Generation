@@ -51,7 +51,7 @@ def collate_fn(batch):
     return [imgs, names, shapes, bboxes]
 
 if __name__=="__main__":
-    prn = PRN(is_dlib = False, is_opencv = False) 
+    prn = PRN(bbox_include=True) 
     shutil.rmtree("./results", ignore_errors=True)
     os.makedirs("./results")
     shutil.rmtree("./comparision", ignore_errors=True)

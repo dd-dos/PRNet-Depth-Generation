@@ -16,7 +16,7 @@ class PRN:
         is_opencv(bool, optional): If true, opencv is used for extracting texture.
         prefix(str, optional): If run at another folder, the absolute path is needed to load the data.
     '''
-    def __init__(self, is_dlib = False, bbox_include = False, is_opencv = False, prefix = '.'):
+    def __init__(self, bbox_include = False, is_dlib = False, is_opencv = False, prefix = '.'):
 
         # resolution of input and output image size.
         self.resolution_inp = 256
