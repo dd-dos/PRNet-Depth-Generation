@@ -7,7 +7,7 @@ from PIL import Image
 import torch
 import torchvision
 from predictor import PosPrediction
-from utils.depth_image import DepthImage
+from utils.depth_image import generate_depth_image
 
 
 class PRN:
@@ -239,7 +239,7 @@ class PRN:
     def create_depth_map(self, pos, shape):
         kpt = self.get_landmarks(pos)
         vertices = self.get_vertices(pos)
-        depth_scene_map = DepthImage.generate_depth_image(vertices, kpt, shape, isMedFilter=True)
+        depth_scene_map = generate_depth_image(vertices, kpt, shape, isMedFilter=True)
 
         return depth_scene_map
 
