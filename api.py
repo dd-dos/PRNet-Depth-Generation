@@ -16,7 +16,7 @@ class PRN:
         is_opencv(bool, optional): If true, opencv is used for extracting texture.
         prefix(str, optional): If run at another folder, the absolute path is needed to load the data.
     '''
-    def __init__(self, is_dlib = False, is_opencv = False, prefix = '.'):
+    def __init__(self, is_dlib = False, bbox_include = False, is_opencv = False, prefix = '.'):
 
         # resolution of input and output image size.
         self.resolution_inp = 256
@@ -24,13 +24,14 @@ class PRN:
 
         #---- load detectors
 
-        if is_dlib:
-            import dlib
-            detector_path = os.path.join(prefix, 'Data/net-data/mmod_human_face_detector.dat')
-            self.face_detector = dlib.cnn_face_detection_model_v1(
-                    detector_path)
-        else:
-            self.face_detector = torch.jit.load("./crop_face_parallel/retinaface_torchscript/model/scripted_model.pt")
+        if not bbox_include:
+            if is_dlib:
+                import dlib
+                detector_path = os.path.join(prefix, 'Data/net-data/mmod_human_face_detector.dat')
+                self.face_detector = dlib.cnn_face_detection_model_v1(
+                        detector_path)
+            else:
+                self.face_detector = torch.jit.load("./crop_face_parallel/retinaface_torchscript/model/scripted_model.pt")
 
         if is_opencv:
             import cv2
