@@ -261,7 +261,6 @@ class PRN:
             depth_map = self.create_depth_map(pos, shapes[idx])
             depth_maps.append(depth_map)
         
-        import ipdb; ipdb.set_trace()
         return depth_maps
 
 
