@@ -60,7 +60,6 @@ def convert_vertices_2_map_interp2d_directly(vertices, shape):
     z = 255 * z_normalize(vertices[:, 2])
     points = vertices[:, :2]
     
-    import ipdb; ipdb.set_trace()
 
     x1, x2, y1, y2 = np.min(vertices[:,0]), np.max(vertices[:,0]), np.min(vertices[:,1]), np.max(vertices[:,1])
     xnew, ynew = np.meshgrid(np.linspace(x1, x2, int(x2-x1)), np.linspace(y1, y2, int(y2-y1))) 
