@@ -54,12 +54,14 @@ if __name__=="__main__":
     prn = PRN(is_dlib = False, is_opencv = False) 
     shutil.rmtree("./results", ignore_errors=True)
     os.makedirs("./results")
+    shutil.rmtree("./comparision", ignore_errors=True)
+    os.makedirs("./comparision")
 
-    loader = DataLoader(CelebA_live(), batch_size=2, num_workers=4, collate_fn=collate_fn)
+    loader = DataLoader(CelebA_live(), batch_size=64, num_workers=4, collate_fn=collate_fn)
     for item in tqdm.tqdm(loader):
         imgs, names, shape, bboxes = item
         depth_maps = prn.predict_batch(imgs, shape, bboxes)
 
         for idx in range(len(names)):
             cv2.imwrite("./results/{}".format(names[idx]), depth_maps[idx])
-
+            cv2.imwrite("./comparision/{}".format(names[idx]), cv2.hconcat([imgs[idx], depth_maps[idx]]))
