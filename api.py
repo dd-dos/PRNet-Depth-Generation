@@ -61,7 +61,7 @@ class PRN:
         return self.pos_predictor.predict(image)
 
 
-    def preprocess(self, input, image_info = None, FaceRect_name_full = None, image_shape = None):
+    def preprocess(self, input, bbox = None, FaceRect_name_full = None, image_shape = None):
         if isinstance(input, str):
             try:
                 image = imread(input)
@@ -74,19 +74,23 @@ class PRN:
         if image.ndim < 3:
             image = np.tile(image[:,:,np.newaxis], [1,1,3])
 
-        if image_info is not None:
-            if np.max(image_info.shape) > 4: # key points to get bounding box
-                kpt = image_info
-                if kpt.shape[0] > 3:
-                    kpt = kpt.T
-                left = np.min(kpt[0, :]); right = np.max(kpt[0, :]); 
-                top = np.min(kpt[1,:]); bottom = np.max(kpt[1,:])
-            else:  # bounding box
-                bbox = image_info
-                left = bbox[0]; right = bbox[1]; top = bbox[2]; bottom = bbox[3]
+        if bbox is not None:
+            # if np.max(bbox.shape) > 4: # key points to get bounding box
+            #     kpt = bbox
+            #     if kpt.shape[0] > 3:
+            #         kpt = kpt.T
+            #     left = np.min(kpt[0, :]); right = np.max(kpt[0, :]); 
+            #     top = np.min(kpt[1,:]); bottom = np.max(kpt[1,:])
+            # else:  # bounding box
+            #     bbox = bbox
+            #     left = bbox[0]; right = bbox[1]; top = bbox[2]; bottom = bbox[3]
+            # old_size = (right - left + bottom - top)/2
+            # center = np.array([right - (right - left) / 2.0, bottom - (bottom - top) / 2.0])
+
+            left, top, right, bottom = bbox
             old_size = (right - left + bottom - top)/2
-            center = np.array([right - (right - left) / 2.0, bottom - (bottom - top) / 2.0])
-            size = int(old_size*1.6)
+            center = np.array([right - (right - left) / 2.0, bottom - (bottom - top) / 2.0 + old_size*0.14])
+            size = int(old_size*1.58)
         elif FaceRect_name_full is not None:
             fid = open(FaceRect_name_full, 'r')
             lines = fid.readlines()
@@ -138,12 +142,12 @@ class PRN:
         return pos
 
 
-    def process(self, input, image_info = None, FaceRect_name_full = None, image_shape = None):
+    def process(self, input, bbox = None, FaceRect_name_full = None, image_shape = None):
         ''' 
         process image with crop operation.
         Args:
             input: (h,w,3) array or str(image path). image value range:1~255. 
-            image_info(optional): the bounding box information of faces. if None, will use dlib to detect face. 
+            bbox(optional): the bounding box information of faces. if None, will use dlib to detect face. 
 
         Returns:
             pos: the 3D position map. (256, 256, 3).
@@ -159,7 +163,7 @@ class PRN:
 
         # run our net
         #st = time()
-        cropped_image, tform = self.preprocess(input, image_info, FaceRect_name_full, image_shape)
+        cropped_image, tform = self.preprocess(input, bbox, FaceRect_name_full, image_shape)
         cropped_pos = self.net_forward(cropped_image)
         pos = self.postprocess(cropped_pos, tform)
         
@@ -238,13 +242,13 @@ class PRN:
         return depth_scene_map
 
 
-    def predict_batch(self, imgs, shapes):
+    def predict_batch(self, imgs, shapes, bboxes):
         processed_imgs = []
         tforms = []
         depth_maps = []
 
         for idx in range(len(imgs)):
-            process_img, tform = self.preprocess(imgs[idx], None, None, shapes[idx])
+            process_img, tform = self.preprocess(imgs[idx], bboxes[idx], None, shapes[idx])
             processed_imgs.append(process_img)
             tforms.append(tform)
 
