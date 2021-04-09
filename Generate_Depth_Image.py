@@ -4,7 +4,7 @@ from skimage.io import imread, imsave
 # from PIL import Image
 import cv2
 import os
-
+import time
 from api import PRN
 
 import utils.depth_image as DepthImage
@@ -32,7 +32,8 @@ class CelebA_live(Dataset):
 
         shape = [img.shape[0], img.shape[1]]
         
-        str_bbox = full_name.split("_")[1:-1].append(full_name.split("_")[-1].replace(".jpg", ""))
+        str_bbox = full_name.split("_")[1:-1]
+        str_bbox.append(full_name.split("_")[-1].replace(".jpg", ""))
         bbox = [float(str_bbox[i]) for i in range(4)]
 
         return img, name, shape, bbox
@@ -57,16 +58,28 @@ if __name__=="__main__":
     shutil.rmtree("./comparision", ignore_errors=True)
     os.makedirs("./comparision")
 
-    loader = DataLoader(CelebA_live(), batch_size=1, num_workers=0, collate_fn=collate_fn)
+    loader = DataLoader(CelebA_live(), batch_size=64, num_workers=4, collate_fn=collate_fn)
     for item in tqdm.tqdm(loader):
         imgs, names, shapes, bboxes = item
+        
+        # t0 = time.time()
         cropped_poses, tforms = prn.predict_batch(imgs, shapes, bboxes)
+        # t1 = time.time()
+        # print("predict batch took {}".format(t1-t0))
 
         for idx in range(len(cropped_poses)):
             pos = prn.postprocess(cropped_poses[idx], tforms[idx])
             depth_map = prn.create_depth_map(pos, shapes[idx])
-            depth_maps.append(depth_map)
 
-        # for idx in range(len(names)):
-            cv2.imwrite("./results/{}".format(names[idx]), depth_maps[idx])
-            cv2.imwrite("./comparision/{}".format(names[idx]), cv2.hconcat([imgs[idx], depth_maps[idx]]))
+            cv2.imwrite("./results/{}".format(names[idx]), depth_map)
+            height, width = depth_map.shape
+            holder = np.ones((height, width, 3))
+            holder[:, :, 0] = depth_map
+            holder[:, :, 1] = depth_map
+            holder[:, :, 2] = depth_map
+
+            out_img = cv2.cvtColor(imgs[idx], cv2.COLOR_BGR2RGB)
+            cv2.imwrite("./comparision/{}".format(names[idx]), cv2.hconcat([out_img, holder.astype(np.uint8)]))
+
+        # t2 = time.time()
+        # print("create depth map took {}".format(t2-t1))
